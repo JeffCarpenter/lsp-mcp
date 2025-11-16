@@ -5,21 +5,21 @@
 #+OPTIONS: toc:2
 
 -* Goal
-- Add Jest regression tests for [[file:src/app.ts::73][=App.registerTools()=]] and [[file:src/lsp-manager.ts::3][=LspManager=]] selection logic to backfill coverage for recently documented behaviors.
+- Add Jest regression tests for [[file:../src/app.ts::73][=App.registerTools()=]] and [[file:../src/lsp-manager.ts::3][=LspManager=]] selection logic to backfill coverage for recently documented behaviors.
 
 * Scope
 - Cover tool registration (default debugging tools plus dynamically generated LSP methods) and multi-LSP selection heuristics (by ID, language, extension, fallback).
 
 * Tasks
 1. **Harness Setup**
-   - Create =src/__tests__/app.registerTools.spec.ts= with dependency fakes for [[file:src/tool-manager.ts::11][=ToolManager=]] and [[file:src/lsp-manager.ts::3][=LspManager=]].
+   - Create =src/__tests__/app.registerTools.spec.ts= with dependency fakes for [[file:../src/tool-manager.ts::11][=ToolManager=]] and [[file:../src/lsp-manager.ts::3][=LspManager=]].
    - Add `test` script prerequisites if Jest config needs updating.
 2. **`App.registerTools()` Cases**
-   - Assert [[file:src/app.ts::75][=lsp_info=]] and [[file:src/app.ts::102][=file_contents_to_uri=]] registration with correct schema/description.
-   - Mock LSP method metadata to ensure dynamic tools respect method IDs, pruned properties, and optional =lsp= enum injection when [[file:src/lsp-manager.ts::51][=LspManager.hasManyLsps()=]] is true.
+   - Assert [[file:../src/app.ts::75][=lsp_info=]] and [[file:../src/app.ts::102][=file_contents_to_uri=]] registration with correct schema/description.
+   - Mock LSP method metadata to ensure dynamic tools respect method IDs, pruned properties, and optional =lsp= enum injection when [[file:../src/lsp-manager.ts::51][=LspManager.hasManyLsps()=]] is true.
 3. **`LspManager` Selection Logic**
    - New spec file =src/__tests__/lsp-manager.spec.ts=.
-   - Verify [[file:src/lsp-manager.ts::31][=getLsp=]], [[file:src/lsp-manager.ts::39][=getLspByLanguage=]], [[file:src/lsp-manager.ts::43][=getLspByExtension=]], and [[file:src/lsp-manager.ts::49][=getDefaultLsp=]] return expected clients, including case-insensitivity and conflict handling.
+   - Verify [[file:../src/lsp-manager.ts::31][=getLsp=]], [[file:../src/lsp-manager.ts::39][=getLspByLanguage=]], [[file:../src/lsp-manager.ts::43][=getLspByExtension=]], and [[file:../src/lsp-manager.ts::49][=getDefaultLsp=]] return expected clients, including case-insensitivity and conflict handling.
    - Add tests confirming extension fallback (e.g., URI-derived `.ts`) matches the intended LSP when explicit IDs are absent.
 4. **CI Hooks**
    - Update documentation ([[file:HACKING.org::56][HACKING.org:56-60]] testing section) to reference the new test files.

@@ -1,0 +1,36 @@
+#+TITLE: Documentation Review Follow-up
+#+DATE: 2025-11-16
+#+FILETAGS: :review:planning:docs:
+#+CATEGORY: review-remedies
+#+OPTIONS: toc:2
+
+* Findings
+1. **Testing Guidance Drift** – `doc/AGENTS.md:21` and `doc/HACKING.org:45-59` prescribe running `yarn test`/Jest even though no Jest configuration or dependency exists. Contributors who follow these steps will fail immediately.
+2. **Schema Path Ambiguity** – `doc/HACKING.org:21-22` mentions `src/resources/` without clarifying the concrete files (`generated.protocol.schema.json`, etc.), leading to confusion about which artifacts are editable.
+3. **Unstable PR References** – `doc/PR_NOTES.org:10-12` hardcodes line ranges that will drift as docs evolve, reducing their usefulness for reviewers.
+4. **WORK Plan Prerequisites** – `doc/WORK.org:14-26` assumes Jest scaffolding exists; actionable steps to add Jest/ts-jest are missing.
+
+* Remedy Tasks
+**F1. Testing Guidance Drift**
+1. Evaluate options:
+   - Option A: Introduce Jest + ts-jest config (`jest.config.ts`, ts-node hooks) plus minimal smoke tests to justify docs.
+   - Option B: Until Jest exists, edit `doc/AGENTS.md` and `doc/HACKING.org` to describe manual MCP CLI verification only.
+2. If choosing Option A, implement:
+   - Add devDependencies (`jest`, `ts-jest`, `@types/jest`) and generate config wired to `yarn test`.
+   - Create placeholder tests (e.g., `src/__tests__/smoke.spec.ts`) so CI demonstrates the runner works.
+   - Update docs to mention the new setup commands (link to `doc/WORK.org` plan).
+
+**F2. Schema Path Ambiguity**
+1. Clarify `doc/HACKING.org:21-22` wording to reference `src/resources/generated.protocol.schema.json` and explain how it is copied to `dist/resources/`.
+2. Add a short subsection outlining the regeneration workflow (source of the schema, commands to refresh) so editors know which files to touch.
+
+**F3. Unstable PR References**
+1. Replace line-number pointers in `doc/PR_NOTES.org` with persistent section links:
+   - Use Org `CUSTOM_ID`s or headings inside `doc/AGENTS.md` / `doc/HACKING.org`.
+   - Alternatively, document how to grab GitHub permalinks when drafting the PR.
+2. Document the process inside `doc/PR_NOTES.org` so contributors know how to refresh references when content moves.
+
+**F4. WORK Plan Prerequisites**
+1. Extend `doc/WORK.org` “Harness Setup” to enumerate missing tooling (jest config file, ts-jest transformer, sample mocks).
+2. Cross-link the new entries to whichever Option (A or B) was decided in F1 so the plan stays synchronized.
+3. Once Jest exists, add TODOs to actually implement the tests referenced in the plan.
