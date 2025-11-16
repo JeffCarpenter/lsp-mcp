@@ -1,0 +1,12 @@
+#+TITLE: PR Reference Notes
+#+DATE: 2025-11-16
+#+FILETAGS: :pr:docs:guides:
+#+CATEGORY: review-support
+#+OPTIONS: toc:nil
+
+* Summary
+- List the key doc edits in your PR description using the entries below so reviewers can deep-link into the repo changes.
+
+* References
+1. [[file:AGENTS.md::3][AGENTS.md:3-33]] – Adds “Repository Guidelines” covering structure, workflows, style, testing, PR hygiene, and security tips tailored to this repo.
+2. [[file:HACKING.org::14][HACKING.org:14-66]] – Upgrades the hacking handbook with metadata plus direct links to =App=, =ToolManager=, =LspManager=, =LspClientImpl=, config schemas, and dev configs.
