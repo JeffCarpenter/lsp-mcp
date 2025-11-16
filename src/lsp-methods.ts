@@ -94,54 +94,86 @@ async function getDereferencedJsonSchema() {
   return dereferenced as { definitions: Record<string, JSONSchema4> };
 }
 
-let methods: LSPMethods[] | undefined = undefined;
+let cachedMethods: LSPMethods[] | undefined;
+let cachedLookups:
+  | {
+      metaModel: Map<string, MetaModel["requests"][number]>;
+      jsonSchema: Map<string, JSONSchema4>;
+      methodOrder: string[];
+    }
+  | undefined;
 
-export async function getLspMethods(
-  allowedMethodIds: string[] | undefined = undefined
-): Promise<LSPMethods[]> {
-  // technically this could do work twice if it's called asynchronously, but it's not a big deal
-  if (methods !== undefined) {
-    return methods;
+async function loadLookups() {
+  if (!cachedLookups) {
+    const [metaModel, jsonSchema] = await Promise.all([
+      getMetaModel(),
+      getDereferencedJsonSchema(),
+    ]);
+
+    cachedLookups = {
+      methodOrder: metaModel.requests.map((request) => request.method),
+      metaModel: new Map(metaModel.requests.map((request) => [request.method, request])),
+      jsonSchema: new Map(
+        Object.values(jsonSchema.definitions)
+          .filter(
+            (definition) => definition.properties?.method?.enum?.length === 1,
+          )
+          .map((definition) => [
+            String(definition.properties?.method?.enum?.[0]),
+            definition,
+          ]),
+      ),
+    };
   }
 
-  const metaModel = await getMetaModel();
-  const metaModelLookup = new Map(metaModel.requests.map((request) => [request.method, request]))
+  return cachedLookups;
+}
 
-  const jsonSchema = await getDereferencedJsonSchema();
-  const jsonSchemaLookup = new Map(
-    Object.values(jsonSchema.definitions)
-      .filter(definition => definition.properties?.method?.enum?.length === 1)
-      .map(definition => [
-        String(definition.properties?.method?.enum?.[0]),
-        definition
-      ])
-  );
+function sanitizeInputSchema(paramsSchema?: JSONSchema4): JSONSchema4 {
+  if (!paramsSchema || !paramsSchema.type) {
+    return { type: "object" };
+  }
 
-  const methodIds = allowedMethodIds ?? metaModel.requests.map((request) => request.method).filter((id) => !toolBlacklist.includes(id));
+  return paramsSchema;
+}
 
-  methods = methodIds.map((id) => {
-    const definition = jsonSchemaLookup.get(id)
-    // TODO: Because I've sourced the jsonapi and the metamodel from different sources, they aren't always in sync.
-    // In the case when I don't have a jsonschema, I'll just skip for now
-    if (!definition?.properties) {
-      return undefined;
-    }
+function describeMethod(
+  id: string,
+  metaModelLookup: Map<string, MetaModel["requests"][number]>,
+): string {
+  const documentation = metaModelLookup.get(id)?.documentation ?? "";
+  return `method: ${id}\n${documentation}`;
+}
 
-    // TODO: Not sure if this is the best way to handle this
-    // But this occurs when the jsonschema has no param properties
-    let inputSchema = definition.properties.params
-    if (!inputSchema || !inputSchema.type) {
-      inputSchema = {
-        type: 'object' as 'object',
+export async function getLspMethods(
+  allowedMethodIds: string[] | undefined = undefined,
+): Promise<LSPMethods[]> {
+  if (cachedMethods) {
+    return cachedMethods;
+  }
+
+  const { metaModel, jsonSchema, methodOrder } = await loadLookups();
+
+  const candidateIds = allowedMethodIds ?? methodOrder;
+  const filteredMethodIds = candidateIds.filter((id) => !toolBlacklist.includes(id));
+
+  const generated = filteredMethodIds
+    .map((id) => {
+      const definition = jsonSchema.get(id);
+      const paramsSchema = definition?.properties?.params;
+
+      if (!definition?.properties) {
+        return undefined;
       }
-    }
 
-    return {
-      id: id,
-      description: `method: ${id}\n${metaModelLookup.get(id)?.documentation ?? ""}`,
-      inputSchema: inputSchema,
-    }
-  }).filter((tool) => tool !== undefined);
+      return {
+        id,
+        description: describeMethod(id, metaModel),
+        inputSchema: sanitizeInputSchema(paramsSchema),
+      };
+    })
+    .filter((method): method is LSPMethods => method !== undefined);
 
-  return methods
+  cachedMethods = generated;
+  return cachedMethods;
 }
