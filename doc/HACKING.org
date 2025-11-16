@@ -54,10 +54,11 @@
 - **Custom tools**: Register additional =Tool=s inside [[file:../src/app.ts::73][=App.registerTools()=]] with tight JSON schemas and text-based results; MCP clients expect strings, not binary blobs.
 
 * Testing & Verification
-- Unit-level coverage should target config parsing and tool plumbing. Co-locate Jest specs under =src/__tests__/= or next to modules (e.g., [[file:../src/app.ts::87][App helpers]]) and run them with =yarn test=, mocking [[file:../src/lsp.ts::21][=LspClient=]] to avoid real processes.
+- Unit-level coverage now includes [[file:../src/__tests__/app.registerTools.spec.ts][App.registerTools]] and [[file:../src/__tests__/lsp-manager.spec.ts][LspManager selection]] suites. Run =yarn test= (Jest + ts-jest) locally before opening a PR.
+- For new features, keep adding focused specs under =src/__tests__/= and mock [[file:../src/lsp.ts::21][=LspClient=]] to avoid spawning real servers.
 - Integration checks rely on MCP clients: run =yarn mcp-cli:simple= after changes to schemas, LSP selection logic, or tool registration to confirm tool inventories.
 - Before publishing Docker images or tags, execute =yarn build && yarn start --config dev/prod.config.json= to verify the transpiled binary boots without TypeScript helpers.
-- No automated gating exists, so record manual verification commands in PR descriptions.
+- No automated gating exists, so record manual verification commands (Jest, MCP CLI flows) in PR descriptions.
 
 * Debugging & Failure Modes
 - Pass =--verbose= to route JSON-RPC chatter to stderr. When MCP hosts suppress logs, rerun locally with identical arguments plus verbosity to capture traces.

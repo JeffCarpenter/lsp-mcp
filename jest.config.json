@@ -1,0 +1,9 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "verbose": false,
+  "collectCoverage": true,
+  "coverageReporters": ["text", "lcov"],
+  "passWithNoTests": true
+}
+
