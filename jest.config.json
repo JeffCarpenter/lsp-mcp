@@ -4,6 +4,18 @@
   "verbose": false,
   "collectCoverage": true,
   "coverageReporters": ["text", "lcov"],
-  "passWithNoTests": true
+  "coverageDirectory": "coverage",
+  "passWithNoTests": true,
+  "reporters": [
+    "default",
+    [
+      "jest-junit",
+      {
+        "outputDirectory": "reports",
+        "outputName": "jest-junit.xml",
+        "ancestorSeparator": " › "
+      }
+    ]
+  ]
 }
 
