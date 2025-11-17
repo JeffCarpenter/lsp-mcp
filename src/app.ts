@@ -14,6 +14,7 @@ import {
 	lspMethodHandler,
 	openFileContents,
 } from "./lsp-methods";
+import { selectLsp } from "./lsp-selection";
 import { createMcp, startMcp } from "./mcp";
 import { ToolManager } from "./tool-manager";
 
@@ -188,32 +189,13 @@ export class App {
 			this.toolManager.registerTool({
 				id: method.id.replace("/", "_"),
 				description: method.description,
-				inputSchema: inputSchema,
+				inputSchema,
 				handler: (args) => {
-					let lsp: LspClient | undefined;
-					if (lspProperty) {
-						const lspId = args[lspProperty.name];
-						if (lspId) {
-							lsp = this.lspManager.getLsp(lspId);
-							if (!lsp) {
-								// Sometimes the LLM gets confused and specifies the language instead of the LSP ID
-								lsp = this.lspManager.getLspByLanguage(lspId);
-							}
-						}
-
-						if (!lsp && args.textDocument?.uri) {
-							// try by file extension
-							const extension = args.textDocument.uri.split(".").pop();
-							if (extension) {
-								lsp = this.lspManager.getLspByExtension(extension);
-							}
-						}
-					}
-
-					// I wonder if using the last used LSP would be a better default...
-					if (!lsp) {
-						lsp = this.lspManager.getDefaultLsp();
-					}
+					const lsp = selectLsp({
+						args,
+						lspManager: this.lspManager,
+						lspPropertyName: lspProperty?.name,
+					});
 
 					return lspMethodHandler(lsp, id, args);
 				},
