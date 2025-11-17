@@ -1,50 +1,42 @@
-import { Logger } from "vscode-jsonrpc";
+import type { Logger } from "vscode-jsonrpc";
 
 function formatMessage(message: string) {
-  if (!message.endsWith("\n")) {
-    message += "\n";
-  }
-
-  return message;
+	return message.endsWith("\n") ? message : `${message}\n`;
 }
 
 export const errorLogger: Logger = {
-  error: (message: string) => {
-    console.error(formatMessage(message));
-  },
-  warn: (message: string) => {
-    console.warn(formatMessage(message));
-  },
-  info: (message: string) => {
-    console.info(formatMessage(message));
-  },
-  log: (message: string) => {
-    console.log(formatMessage(message));
-  },
+	error: (message: string) => {
+		console.error(formatMessage(message));
+	},
+	warn: (message: string) => {
+		console.warn(formatMessage(message));
+	},
+	info: (message: string) => {
+		console.info(formatMessage(message));
+	},
+	log: (message: string) => {
+		console.log(formatMessage(message));
+	},
 };
 
 export const consoleLogger: Logger = {
-  error: (message: string) => {
-    console.error(formatMessage(message));
-  },
-  warn: (message: string) => {
-    console.warn(formatMessage(message));
-  },
-  info: (message: string) => {
-    console.info(formatMessage(message));
-  },
-  log: (message: string) => {
-    console.log(formatMessage(message));
-  },
+	error: (message: string) => {
+		console.error(formatMessage(message));
+	},
+	warn: (message: string) => {
+		console.warn(formatMessage(message));
+	},
+	info: (message: string) => {
+		console.info(formatMessage(message));
+	},
+	log: (message: string) => {
+		console.log(formatMessage(message));
+	},
 };
 
 export const nullLogger: Logger = {
-  error: (message: string) => {
-  },
-  warn: (message: string) => {
-  },
-  info: (message: string) => {
-  },
-  log: (message: string) => {
-  },
+	error: (message: string) => {},
+	warn: (message: string) => {},
+	info: (message: string) => {},
+	log: (message: string) => {},
 };

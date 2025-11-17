@@ -1,21 +1,21 @@
 {
-  "preset": "ts-jest",
-  "testEnvironment": "node",
-  "verbose": false,
-  "collectCoverage": true,
-  "coverageReporters": ["text", "lcov"],
-  "coverageDirectory": "coverage",
-  "passWithNoTests": true,
-  "reporters": [
-    "default",
-    [
-      "jest-junit",
-      {
-        "outputDirectory": "reports",
-        "outputName": "jest-junit.xml",
-        "ancestorSeparator": " › "
-      }
-    ]
-  ]
+	"preset": "ts-jest",
+	"testEnvironment": "node",
+	"verbose": false,
+	"collectCoverage": true,
+	"coverageReporters": ["text", "lcov"],
+	"coverageDirectory": "coverage",
+	"passWithNoTests": true,
+	"reporters": [
+		"default",
+		[
+			"jest-junit",
+			{
+				"outputDirectory": "reports",
+				"outputName": "jest-junit.xml",
+				"ancestorSeparator": " \u00e2\u20ac\u00ba "
+			}
+		]
+	],
+	"testPathIgnorePatterns": ["<rootDir>/dist/"]
 }
-

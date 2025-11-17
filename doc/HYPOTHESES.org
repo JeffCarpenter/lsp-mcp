@@ -1,0 +1,33 @@
+#+TITLE: HYPOTHESES Ledger
+#+DATE: 2025-11-16
+#+FILETAGS: :research:hypothesis:
+
+* H1 Type-Safe Tool Contracts reduce MCP failure modes :types:tools:
+:PROPERTIES:
+:Author: Codex Agent
+:Status: active
+:Test: Add stricter `ToolArguments` typing + runtime validation hooks
+:END:
+- Observed Biome repeatedly flagging `Record<string, any>` signatures (`ToolManager`, `LspClient`).
+- **Hypothesis**: enforcing `unknown` + schema-derived zod parsing at tool boundaries will cut CI regressions and align logging with MCP expectations.
+- **Next probe**: prototype a thin runtime validator that converts JSON Schema -> Zod and asserts inputs before delegating to `lspMethodHandler`.
+
+* H2 Diagnostics noise disappears once coverage artifacts are ignored upstream :diagnostics:ci:
+:PROPERTIES:
+:Author: Codex Agent
+:Status: active
+:Test: Configure reports/coverage exclusions in Biome + Actions upload steps
+:END:
+- Biome surfaced >300 lint issues inside `coverage/` HTML/CSS and generated `dev/dev.config.json` comments.
+- **Hypothesis**: explicitly ignoring `coverage/` and comment-heavy dev configs keeps lint budgets small without hiding real issues.
+- **Next probe**: wire `.biomeignore` to match `.gitignore` coverage patterns and confirm GH annotations shrink accordingly.
+
+* H3 Consistent Yarn invocation removes Windows shim failures :toolchain:yarn:
+:PROPERTIES:
+:Author: Codex Agent
+:Status: validated
+:Evidence: Local `yarn test` failed until using `${Env:FNM_MULTISHELL_PATH}\yarnpkg.ps1`
+:END:
+- GH runner logs show Corepack bootstrapping Yarn 1.x despite repo pinning 4.11.
+- **Hypothesis**: always invoking Yarn through `fnm` shims ensures identical toolchain paths locally/CI, preventing missing `genhtml` & Jest artifacts.
+- **Action**: Documented invocation pattern in WORK.org; follow-up to bake into README/CI scripts.

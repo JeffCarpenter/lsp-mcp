@@ -28,3 +28,14 @@
 * Risks & Mitigations
 - **Mock complexity**: Use lightweight fakes rather than full MCP stacks to keep tests deterministic.
 - **Schema drift**: Reuse the existing JSON schema fixtures or create trimmed test fixtures to avoid coupling tests to large generated files.
+* 2025-11-16 CI + Type Safety Hardening
+:PROPERTIES:
+:Author: Codex Agent
+:Scope: LSP runtime, tests, CI
+:Tags: :ci:type-safety:tooling:
+:END:
+- Verified GitHub Actions failure (Run 19404739190) stemmed from TypeScript type errors in `src/lsp.ts` and missing jest artifacts; reproduced locally via `yarn build`.
+- Refactored `src/lsp.ts` initialize flow to use typed `protocol.InitializeRequest`, `unknown` payloads, and proper `childProcess`/`connection` assignment to satisfy strict TS+Biome linting.
+- Added `@types/json-schema`, Yarn 4.11 metadata, `.biomeignore` tuning, and taught tests to ignore compiled `dist/` output; documented the need to call yarn through `${Env:FNM_MULTISHELL_PATH}` to avoid shim issues.
+- Upgraded `ToolManager`/test suites to stronger types, converted Node imports to `node:` specifiers, converted catches to `unknown`, and enforced template literals/for-of loops per Biome guidance.
+- Rebuilt `ci` workflow expectations by ensuring `yarn test --runInBand` and `biome check src` pass; left commands for future verification in this log entry.

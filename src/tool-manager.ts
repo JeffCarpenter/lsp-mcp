@@ -1,37 +1,39 @@
-import { JSONSchema4 } from "json-schema";
-import { Logger } from "vscode-languageserver-protocol";
+import type { JSONSchema4 } from "json-schema";
+import type { Logger } from "vscode-languageserver-protocol";
+
+export type ToolArguments = Record<string, unknown>;
 
 export interface Tool {
-  id: string;
-  description: string;
-  inputSchema: JSONSchema4;
-  handler: (args: Record<string, any>) => Promise<string>;
+	id: string;
+	description: string;
+	inputSchema: JSONSchema4;
+	handler: (args?: ToolArguments) => Promise<unknown> | unknown;
 }
 
 export class ToolManager {
-  private toolsById: Map<string, Tool> = new Map();
+	private toolsById: Map<string, Tool> = new Map();
 
-  constructor(private readonly logger: Logger) {}
+	constructor(private readonly logger: Logger) {}
 
-  public registerTool(tool: Tool): void {
-    this.logger.info(`Registering tool ${tool.id}`);
-    this.toolsById.set(tool.id, tool);
-  }
+	public registerTool(tool: Tool): void {
+		this.logger.info(`Registering tool ${tool.id}`);
+		this.toolsById.set(tool.id, tool);
+	}
 
-  public async callTool(id: string, args: Record<string, any>): Promise<string> {
-    const tool = this.getTool(id);
-    if (!tool) {
-      throw new Error(`Tool ${id} not found`);
-    }
-    return tool.handler(args);
-  }
+	public async callTool(id: string, args: ToolArguments): Promise<unknown> {
+		const tool = this.getTool(id);
+		if (!tool) {
+			throw new Error(`Tool ${id} not found`);
+		}
 
-  public getTools(): Tool[] {
-    return Array.from(this.toolsById.values());
-  }
+		return await Promise.resolve(tool.handler(args));
+	}
 
-  private getTool(id: string): Tool | undefined {
-    return this.toolsById.get(id);
-  }
+	public getTools(): Tool[] {
+		return Array.from(this.toolsById.values());
+	}
+
+	private getTool(id: string): Tool | undefined {
+		return this.toolsById.get(id);
+	}
 }
-

@@ -1,263 +1,288 @@
-
-import { LspClient, LspClientImpl } from "./lsp";
-import { createMcp, startMcp } from "./mcp";
+import type { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
 import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
+	CallToolRequestSchema,
+	ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { getLspMethods, lspMethodHandler, LSPMethods, openFileContents } from "./lsp-methods";
-import { ToolManager } from "./tool-manager";
-import { Logger } from "vscode-jsonrpc";
-import { Config } from "./config";
-import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
-import { JSONSchema4, JSONSchema4TypeName } from "json-schema";
+import type { JSONSchema4, JSONSchema4TypeName } from "json-schema";
+import type { Logger } from "vscode-jsonrpc";
+import type { Config } from "./config";
+import { type LspClient, LspClientImpl } from "./lsp";
 import { LspManager } from "./lsp-manager";
+import {
+	type LSPMethods,
+	getLspMethods,
+	lspMethodHandler,
+	openFileContents,
+} from "./lsp-methods";
+import { createMcp, startMcp } from "./mcp";
+import { ToolManager } from "./tool-manager";
 
 export class App {
-  private readonly toolManager: ToolManager;
-  private readonly lspManager: LspManager;
-  private readonly mcp: McpServer;
-  private readonly availableMethodIds: Promise<LSPMethods[]>;
-  private readonly workspace: string;
+	private readonly toolManager: ToolManager;
+	private readonly lspManager: LspManager;
+	private readonly mcp: McpServer;
+	private readonly availableMethodIds: Promise<LSPMethods[]>;
+	private readonly workspace: string;
 
-  constructor(
-    config: Config,
-    protected readonly logger: Logger,
-  ) {
-    // keeps track of all the tools we're sending to the MCP
-    this.toolManager = new ToolManager(logger);
-    // keeps track of all the LSP Clients we're using
-    this.lspManager = new LspManager(this.buildLsps(config.lsps, logger));
-    // the MCP server
-    this.mcp = createMcp();
-    // The LSP methods we support (textDocument/foo, etc)
-    this.availableMethodIds = getLspMethods(config.methods);
+	constructor(
+		config: Config,
+		protected readonly logger: Logger,
+	) {
+		// keeps track of all the tools we're sending to the MCP
+		this.toolManager = new ToolManager(logger);
+		// keeps track of all the LSP Clients we're using
+		this.lspManager = new LspManager(this.buildLsps(config.lsps, logger));
+		// the MCP server
+		this.mcp = createMcp();
+		// The LSP methods we support (textDocument/foo, etc)
+		this.availableMethodIds = getLspMethods(config.methods);
 
-    this.workspace = config.workspace ?? "/";
+		this.workspace = config.workspace ?? "/";
 
-    // Cleanup on any signal
-    process.on('SIGINT', () => this.dispose());
-    process.on('SIGTERM', () => this.dispose());
-    process.on('exit', () => this.dispose());
-  }
+		// Cleanup on any signal
+		process.on("SIGINT", () => this.dispose());
+		process.on("SIGTERM", () => this.dispose());
+		process.on("exit", () => this.dispose());
+	}
 
-  private async initializeMcp() {
-    this.mcp.setRequestHandler(ListToolsRequestSchema, async () => {
-      const mcpTools = this.toolManager.getTools().map((tool) => ({
-        name: tool.id,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-      }));
+	private async initializeMcp() {
+		this.mcp.setRequestHandler(ListToolsRequestSchema, async () => {
+			const mcpTools = this.toolManager.getTools().map((tool) => ({
+				name: tool.id,
+				description: tool.description,
+				inputSchema: tool.inputSchema,
+			}));
 
-      return {
-        tools: mcpTools
-      };
-    });
+			return {
+				tools: mcpTools,
+			};
+		});
 
-    this.mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
-      if (!args) {
-        throw new Error("No arguments");
-      }
+		this.mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
+			const { name, arguments: args } = request.params;
+			if (!args) {
+				throw new Error("No arguments");
+			}
 
-      const result = await this.toolManager.callTool(name, args);
-      const serialized =
-        typeof result === "string" ? result : JSON.stringify(result, null, 2);
+			const result = await this.toolManager.callTool(name, args);
+			const serialized =
+				typeof result === "string" ? result : JSON.stringify(result, null, 2);
 
-      return {
-        content: [{ type: "text", text: serialized }],
-      };
-    });
-  }
+			return {
+				content: [{ type: "text", text: serialized }],
+			};
+		});
+	}
 
-  private async registerTools() {
-    this.toolManager.registerTool({
-      id: "lsp_info",
-      description: "Returns information about the the LSP tools available. This is useful for debugging which programming languages are supported.",
-      inputSchema: {
-        type: "object" as "object",
-      },
-      handler: async () => {
-        const result = this.lspManager.getLsps().map((lsp) => {
-          const started = lsp.isStarted();
-          return {
-            id: lsp.id,
-            languages: lsp.languages,
-            extensions: lsp.extensions,
-            // Remember, this is communicating with an AI. It doesn't care about type safety
-            started: started
-              ? true
-              : `Not started. LSP will start automatically when needed, such as when analyzing a file with extensions ${lsp.extensions.join(", ")}.`,
-            capabilities: started
-              ? lsp.capabilities
-              : "LSP not started. Capabilities will be available when started.",
-          };
-        });
+	private async registerTools() {
+		this.toolManager.registerTool({
+			id: "lsp_info",
+			description:
+				"Returns information about the the LSP tools available. This is useful for debugging which programming languages are supported.",
+			inputSchema: {
+				type: "object" as const,
+			},
+			handler: async () => {
+				const result = this.lspManager.getLsps().map((lsp) => {
+					const started = lsp.isStarted();
+					return {
+						id: lsp.id,
+						languages: lsp.languages,
+						extensions: lsp.extensions,
+						// Remember, this is communicating with an AI. It doesn't care about type safety
+						started: started
+							? true
+							: `Not started. LSP will start automatically when needed, such as when analyzing a file with extensions ${lsp.extensions.join(", ")}.`,
+						capabilities: started
+							? lsp.capabilities
+							: "LSP not started. Capabilities will be available when started.",
+					};
+				});
 
-        return JSON.stringify(result, null, 2)
-      },
-    });
+				return JSON.stringify(result, null, 2);
+			},
+		});
 
-    this.toolManager.registerTool({
-      id: "file_contents_to_uri",
-      description:
-        `Creates a URI given some file contents to be used in the LSP methods that require a URI. This is only required if the file is not on the filesystem. Otherwise you may pass the file path directly.`,
-      inputSchema: {
-        type: "object" as "object",
-        properties: {
-          file_contents: {
-            type: "string",
-            description: "The contents of the file",
-          },
-          programming_language: {
-            type: "string",
-            description: "The programming language of the file",
-          },
-        },
-        required: ["file_contents"],
-      },
-      handler: async (args) => {
-        const { file_contents, programming_language } = args;
-        const lsp = this.lspManager.getLspByLanguage(programming_language) || this.lspManager.getDefaultLsp();
-        const uri = `mem://${Math.random().toString(36).substring(2, 15)}.${lsp.id}`;
-        if (!lsp) {
-          throw new Error(`No LSP found for language: ${programming_language}`);
-        }
+		this.toolManager.registerTool({
+			id: "file_contents_to_uri",
+			description:
+				"Creates a URI given some file contents to be used in the LSP methods that require a URI. This is only required if the file is not on the filesystem. Otherwise you may pass the file path directly.",
+			inputSchema: {
+				type: "object" as const,
+				properties: {
+					file_contents: {
+						type: "string",
+						description: "The contents of the file",
+					},
+					programming_language: {
+						type: "string",
+						description: "The programming language of the file",
+					},
+				},
+				required: ["file_contents"],
+			},
+			handler: async (args) => {
+				const { file_contents, programming_language } = args;
+				const lsp =
+					this.lspManager.getLspByLanguage(programming_language) ||
+					this.lspManager.getDefaultLsp();
+				const uri = `mem://${Math.random().toString(36).substring(2, 15)}.${lsp.id}`;
+				if (!lsp) {
+					throw new Error(`No LSP found for language: ${programming_language}`);
+				}
 
-        await openFileContents(lsp, uri, file_contents);
+				await openFileContents(lsp, uri, file_contents);
 
-        return uri;
-      },
-    });
+				return uri;
+			},
+		});
 
-    const availableMethodIds = (await this.availableMethodIds).sort((a, b) => a.id.localeCompare(b.id));
-    const lsps = this.lspManager.getLsps();
-    const lspProperty: JSONSchema4 | undefined = lsps.length > 1 ? {
-      type: "string",
-      name: "lsp",
-      description: "The LSP to use to execute this method. Options are: " +
-        lsps.map((lsp) => `  ${lsp.id} for the programming languages ${lsp.languages.join(", ")}`).join("\n"),
-      enum: lsps.map((lsp) => lsp.id)
-    } : undefined;
+		const availableMethodIds = (await this.availableMethodIds).sort((a, b) =>
+			a.id.localeCompare(b.id),
+		);
+		const lsps = this.lspManager.getLsps();
+		const lspProperty: JSONSchema4 | undefined =
+			lsps.length > 1
+				? {
+						type: "string",
+						name: "lsp",
+						description: `The LSP to use to execute this method. Options are: ${lsps
+							.map(
+								(lsp) =>
+									`  ${lsp.id} for the programming languages ${lsp.languages.join(", ")}`,
+							)
+							.join("\n")}`,
+						enum: lsps.map((lsp) => lsp.id),
+					}
+				: undefined;
 
-    availableMethodIds.forEach((method) => {
-      const id = method.id;
+		for (const method of availableMethodIds) {
+			const id = method.id;
 
-      // Clean up the input schema a bit
-      const inputSchema: JSONSchema4 = this.removeInputSchemaInvariants(method.inputSchema);
-      if (inputSchema.properties) {
-        for (const [propertyKey, property] of Object.entries(inputSchema.properties)) {
-          if (["partialResultToken", "workDoneToken"].includes(propertyKey)) {
-            if (!inputSchema.required || !Array.isArray(inputSchema.required) || !inputSchema.required.includes(propertyKey)) {
-              delete inputSchema.properties[propertyKey];
-            }
-          }
-        }
-      }
+			// Clean up the input schema a bit
+			const inputSchema: JSONSchema4 = this.removeInputSchemaInvariants(
+				method.inputSchema,
+			);
+			if (inputSchema.properties) {
+				for (const [propertyKey, property] of Object.entries(
+					inputSchema.properties,
+				)) {
+					if (["partialResultToken", "workDoneToken"].includes(propertyKey)) {
+						if (
+							!inputSchema.required ||
+							!Array.isArray(inputSchema.required) ||
+							!inputSchema.required.includes(propertyKey)
+						) {
+							delete inputSchema.properties[propertyKey];
+						}
+					}
+				}
+			}
 
-      // If we're set up with more than one LSP, we'll request the LSP to be optionally specified
-      // If it isn't specified, we'll have to use some logic to figure out which LSP to use
-      if (lspProperty && inputSchema.properties) {
-        inputSchema.properties[lspProperty.name] = lspProperty;
-      }
+			// If we're set up with more than one LSP, we'll request the LSP to be optionally specified
+			// If it isn't specified, we'll have to use some logic to figure out which LSP to use
+			if (lspProperty && inputSchema.properties) {
+				inputSchema.properties[lspProperty.name] = lspProperty;
+			}
 
-      this.toolManager.registerTool({
-        id: method.id.replace("/", "_"),
-        description: method.description,
-        inputSchema: inputSchema,
-        handler: (args) => {
-          let lsp: LspClient | undefined;
-          if (lspProperty) {
-            const lspId = args[lspProperty.name];
-            if (lspId) {
-              lsp = this.lspManager.getLsp(lspId);
-              if (!lsp) {
-                // Sometimes the LLM gets confused and specifies the language instead of the LSP ID
-                lsp = this.lspManager.getLspByLanguage(lspId);
-              }
-            }
+			this.toolManager.registerTool({
+				id: method.id.replace("/", "_"),
+				description: method.description,
+				inputSchema: inputSchema,
+				handler: (args) => {
+					let lsp: LspClient | undefined;
+					if (lspProperty) {
+						const lspId = args[lspProperty.name];
+						if (lspId) {
+							lsp = this.lspManager.getLsp(lspId);
+							if (!lsp) {
+								// Sometimes the LLM gets confused and specifies the language instead of the LSP ID
+								lsp = this.lspManager.getLspByLanguage(lspId);
+							}
+						}
 
-            if (!lsp && args.textDocument?.uri) {
-              // try by file extension
-              const extension = args.textDocument.uri.split(".").pop();
-              if (extension) {
-                lsp = this.lspManager.getLspByExtension(extension);
-              }
-            }
-          }
+						if (!lsp && args.textDocument?.uri) {
+							// try by file extension
+							const extension = args.textDocument.uri.split(".").pop();
+							if (extension) {
+								lsp = this.lspManager.getLspByExtension(extension);
+							}
+						}
+					}
 
-          // I wonder if using the last used LSP would be a better default...
-          if (!lsp) {
-            lsp = this.lspManager.getDefaultLsp();
-          }
+					// I wonder if using the last used LSP would be a better default...
+					if (!lsp) {
+						lsp = this.lspManager.getDefaultLsp();
+					}
 
-          return lspMethodHandler(lsp, id, args);
-        },
-      });
-    });
-  }
+					return lspMethodHandler(lsp, id, args);
+				},
+			});
+		}
+	}
 
-  public async start() {
-    await this.registerTools(),
-    await this.initializeMcp(),
+	public async start() {
+		await this.registerTools();
+		await this.initializeMcp();
+		await startMcp(this.mcp);
+	}
 
-    await startMcp(this.mcp);
-  }
+	public async dispose() {
+		if (this.lspManager !== undefined) {
+			for (const lsp of this.lspManager.getLsps()) {
+				lsp.dispose();
+			}
+		}
 
-  public async dispose() {
-    if (this.lspManager !== undefined) {
-      this.lspManager.getLsps().forEach((lsp) => lsp.dispose());
-    }
+		if (this.mcp !== undefined) {
+			await this.mcp.close();
+		}
+	}
 
-    if (this.mcp !== undefined) {
-      await this.mcp.close();
-    }
-  }
+	private async getAvailableMethodIds() {
+		return this.availableMethodIds;
+	}
 
-  private async getAvailableMethodIds() {
-    return this.availableMethodIds;
-  }
+	// Remove invariant types from the input schema since some MCPs have a hard time with them
+	// Looking at you mcp-client-cli
+	private removeInputSchemaInvariants(inputSchema: JSONSchema4): JSONSchema4 {
+		let type = inputSchema.type;
+		if (type && Array.isArray(type)) {
+			if (type.length === 1) {
+				type = type[0] as JSONSchema4TypeName;
+			} else if (type.includes("string")) {
+				type = "string" as JSONSchema4TypeName;
+			} else {
+				// guess
+				type = type[0] as JSONSchema4TypeName;
+			}
+		}
+		return {
+			...inputSchema,
+			type: type,
+			properties: inputSchema.properties
+				? Object.fromEntries(
+						Object.entries(inputSchema.properties).map(([key, value]) => [
+							key,
+							this.removeInputSchemaInvariants(value),
+						]),
+					)
+				: undefined,
+		};
+	}
 
-  // Remove invariant types from the input schema since some MCPs have a hard time with them
-  // Looking at you mcp-client-cli
-  private removeInputSchemaInvariants(inputSchema: JSONSchema4): JSONSchema4 {
-    let type = inputSchema.type;
-    if (type && Array.isArray(type)) {
-      if (type.length === 1) {
-        type = type[0] as JSONSchema4TypeName;
-      } else if (type.includes('string')) {
-        type = 'string' as JSONSchema4TypeName;
-      } else {
-        // guess
-        type = type[0] as JSONSchema4TypeName;
-      }
-    }
-    return {
-      ...inputSchema,
-      type: type,
-      properties: inputSchema.properties
-        ? Object.fromEntries(
-            Object.entries(inputSchema.properties).map(([key, value]) => [
-              key,
-              this.removeInputSchemaInvariants(value),
-            ]),
-          )
-        : undefined,
-    };
-  }
-
-  private buildLsps(lspConfigs: Config["lsps"], logger: Logger): LspClient[] {
-    return lspConfigs.map(
-      (lspConfig) =>
-        new LspClientImpl(
-          lspConfig.id,
-          lspConfig.languages,
-          lspConfig.extensions,
-          this.workspace,
-          lspConfig.command,
-          lspConfig.args,
-          logger,
-        ),
-    );
-  }
+	private buildLsps(lspConfigs: Config["lsps"], logger: Logger): LspClient[] {
+		return lspConfigs.map(
+			(lspConfig) =>
+				new LspClientImpl(
+					lspConfig.id,
+					lspConfig.languages,
+					lspConfig.extensions,
+					this.workspace,
+					lspConfig.command,
+					lspConfig.args,
+					logger,
+				),
+		);
+	}
 }
