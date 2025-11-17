@@ -1,6 +1,6 @@
 import type { LspClient } from "../lsp";
 import type { LspManager } from "../lsp-manager";
-import { selectLsp } from "../lsp-selection";
+import { DefaultLspSelector } from "../lsp-selector";
 
 function stubClient(id: string): LspClient {
 	return {
@@ -28,14 +28,15 @@ function createManager(overrides: Partial<LspManager> = {}): LspManager {
 	return manager as LspManager;
 }
 
-describe("selectLsp", () => {
+describe("DefaultLspSelector", () => {
 	it("returns explicit LSP id", () => {
 		const chosen = stubClient("typescript");
 		const manager = createManager({
 			getLsp: jest.fn(() => chosen),
 		});
+		const selector = new DefaultLspSelector();
 
-		const result = selectLsp({
+		const result = selector.select({
 			args: { lsp: "typescript" },
 			lspManager: manager,
 			lspPropertyName: "lsp",
@@ -47,11 +48,10 @@ describe("selectLsp", () => {
 
 	it("falls back to language identifier", () => {
 		const chosen = stubClient("python");
-		const manager = createManager({
-			getLspByLanguage: jest.fn(() => chosen),
-		});
+		const manager = createManager({ getLspByLanguage: jest.fn(() => chosen) });
+		const selector = new DefaultLspSelector();
 
-		const result = selectLsp({
+		const result = selector.select({
 			args: { lsp: "Python" },
 			lspManager: manager,
 			lspPropertyName: "lsp",
@@ -63,11 +63,10 @@ describe("selectLsp", () => {
 
 	it("uses extension from textDocument uri", () => {
 		const chosen = stubClient("ts-lsp");
-		const manager = createManager({
-			getLspByExtension: jest.fn(() => chosen),
-		});
+		const manager = createManager({ getLspByExtension: jest.fn(() => chosen) });
+		const selector = new DefaultLspSelector();
 
-		const result = selectLsp({
+		const result = selector.select({
 			args: { lsp: "", textDocument: { uri: "file:///tmp/example.ts" } },
 			lspManager: manager,
 			lspPropertyName: "lsp",
@@ -80,8 +79,9 @@ describe("selectLsp", () => {
 	it("falls back to default when no hints", () => {
 		const defaultClient = stubClient("fallback");
 		const manager = createManager({ getDefaultLsp: () => defaultClient });
+		const selector = new DefaultLspSelector();
 
-		const result = selectLsp({ args: {}, lspManager: manager });
+		const result = selector.select({ args: {}, lspManager: manager });
 
 		expect(result).toBe(defaultClient);
 	});

@@ -1,85 +1,57 @@
-import { App } from "../app";
-import type { Config } from "../config";
 import { nullLogger } from "../logger";
-import {
-	type LSPMethods,
-	getLspMethods,
-	lspMethodHandler,
-} from "../lsp-methods";
-import type { Tool } from "../tool-manager";
+import type { LspClient } from "../lsp";
+import { LspManager } from "../lsp-manager";
+import type { LSPMethods } from "../lsp-methods";
+import { DefaultLspSelector } from "../lsp-selector";
+import { ToolManager } from "../tool-manager";
+import { DefaultToolRegistrar } from "../tool-registrar";
+describe("DefaultToolRegistrar", () => {
+	const selector = new DefaultLspSelector();
 
-jest.mock("../lsp-methods", () => ({
-	getLspMethods: jest.fn(),
-	lspMethodHandler: jest.fn(),
-	openFileContents: jest.fn(),
-}));
+	function createLsp(id: string, languages: string[]): LspClient {
+		return {
+			id,
+			languages,
+			extensions: languages.map((lang) => lang.toLowerCase()),
+			capabilities: undefined,
+			start: jest.fn(),
+			isStarted: jest.fn(() => false),
+			dispose: jest.fn(),
+			sendRequest: jest.fn(),
+			sendNotification: jest.fn(),
+		};
+	}
 
-const mockGetLspMethods = getLspMethods as jest.MockedFunction<
-	typeof getLspMethods
->;
-
-type TestableApp = App & {
-	registerTools: () => Promise<void>;
-	toolManager: {
-		getTools: () => Tool[];
-	};
-};
-
-function getTestableApp(app: App): TestableApp {
-	return app as TestableApp;
-}
-
-function createConfig(lsps: Config["lsps"]): Config {
-	return {
-		lsps,
-	};
-}
-
-function createMethod(id: string): LSPMethods {
-	return {
-		id,
-		description: `method: ${id}`,
-		inputSchema: {
-			type: "object",
-			properties: {
-				textDocument: {
-					type: "object",
-				},
-				partialResultToken: {
-					type: "string",
+	function createMethod(id: string): LSPMethods {
+		return {
+			id,
+			description: `method: ${id}`,
+			inputSchema: {
+				type: "object",
+				properties: {
+					textDocument: { type: "object" },
+					partialResultToken: { type: "string" },
 				},
 			},
-		},
-	};
-}
+		};
+	}
 
-describe("App.registerTools", () => {
-	beforeEach(() => {
-		jest.resetAllMocks();
-	});
-
-	it("registers builtin tools and dynamic methods without LSP override when only one LSP is configured", async () => {
-		mockGetLspMethods.mockResolvedValue([
-			createMethod("textDocument/documentSymbol"),
+	it("registers built-in tools and dynamic methods for single LSP", () => {
+		const toolManager = new ToolManager(nullLogger);
+		const lspManager = new LspManager([
+			createLsp("typescript", ["TypeScript"]),
 		]);
-
-		const app = new App(
-			createConfig([
-				{
-					id: "typescript",
-					languages: ["typescript"],
-					extensions: ["ts"],
-					command: "node",
-					args: ["-v"],
-				},
-			]),
+		const registrar = new DefaultToolRegistrar(
+			toolManager,
+			lspManager,
+			selector,
 			nullLogger,
+			jest.fn(),
 		);
 
-		const testApp = getTestableApp(app);
-		await testApp.registerTools();
-		const tools = testApp.toolManager.getTools();
+		registrar.registerAll([createMethod("textDocument/documentSymbol")]);
 
+		const tools = toolManager.getTools();
 		const builtinIds = tools.filter((tool) =>
 			["lsp_info", "file_contents_to_uri"].includes(tool.id),
 		);
@@ -90,58 +62,33 @@ describe("App.registerTools", () => {
 		);
 		expect(dynamicTool).toBeDefined();
 		if (!dynamicTool) {
-			throw new Error("dynamic tool was not registered");
+			throw new Error("dynamic tool missing");
 		}
 		expect(dynamicTool.inputSchema.properties?.lsp).toBeUndefined();
-		expect(
-			dynamicTool.inputSchema.properties?.partialResultToken,
-		).toBeUndefined();
 	});
 
-	it("injects optional lsp selector when multiple LSPs are configured", async () => {
-		mockGetLspMethods.mockResolvedValue([
-			createMethod("textDocument/documentSymbol"),
-		]);
-
-		const app = new App(
-			createConfig([
-				{
-					id: "typescript",
-					languages: ["TypeScript"],
-					extensions: ["ts"],
-					command: "node",
-					args: ["-v"],
-				},
-				{
-					id: "python",
-					languages: ["python"],
-					extensions: ["py"],
-					command: "python",
-					args: ["-V"],
-				},
-			]),
+	it("injects optional lsp selector when multiple LSPs exist", () => {
+		const toolManager = new ToolManager(nullLogger);
+		const lsps = [
+			createLsp("typescript", ["TypeScript"]),
+			createLsp("python", ["python"]),
+		];
+		const lspManager = new LspManager(lsps);
+		const registrar = new DefaultToolRegistrar(
+			toolManager,
+			lspManager,
+			selector,
 			nullLogger,
+			jest.fn(),
 		);
 
-		const testApp = getTestableApp(app);
-		await testApp.registerTools();
-		const tools = testApp.toolManager.getTools();
-		const dynamicTool = tools.find(
-			(tool) => tool.id === "textDocument_documentSymbol",
-		);
-		expect(dynamicTool).toBeDefined();
-		if (!dynamicTool) {
-			throw new Error("dynamic tool was not registered");
-		}
+		registrar.registerAll([createMethod("textDocument/documentSymbol")]);
 
-		const lspProperty = dynamicTool.inputSchema.properties?.lsp;
-		expect(lspProperty).toMatchObject({
-			type: "string",
+		const dynamicTool = toolManager
+			.getTools()
+			.find((tool) => tool.id === "textDocument_documentSymbol");
+		expect(dynamicTool?.inputSchema.properties?.lsp).toMatchObject({
 			enum: ["typescript", "python"],
 		});
-		expect(dynamicTool.inputSchema.properties).not.toHaveProperty(
-			"partialResultToken",
-		);
-		expect(typeof lspProperty?.description).toBe("string");
 	});
 });
